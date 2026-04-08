@@ -10,7 +10,6 @@ import mlflow.sklearn
 # =========================================================
 df = pd.read_csv("telco_churn_preprocessing.csv")
 
-# Konversi semua int64 ke float64 agar tidak ada warning MLflow
 for col in df.columns:
     if df[col].dtype == "int64":
         df[col] = df[col].astype("float64")
@@ -31,20 +30,27 @@ print(f"Distribusi target train: {y_train.value_counts().to_dict()}")
 # =========================================================
 mlflow.set_experiment("telco_churn_experiment")
 
-with mlflow.start_run(run_name="RandomForest_Autolog"):
+# Cek apakah sudah ada active run dari mlflow run command
+# Kalau ada, pakai run yang sudah ada. Kalau tidak, buat baru.
+active_run = mlflow.active_run()
+if active_run:
+    print(f"Menggunakan active run: {active_run.info.run_id}")
+    run_context = mlflow.start_run(run_id=active_run.info.run_id, nested=True)
+else:
+    print("Membuat run baru...")
+    run_context = mlflow.start_run(run_name="RandomForest_Autolog")
 
-    # Autolog — otomatis mencatat parameter, metrik, dan model ke MLflow
+with run_context:
     mlflow.sklearn.autolog()
 
     model = RandomForestClassifier(
         n_estimators=100,
         max_depth=10,
-        class_weight="balanced",   # tangani imbalance 73:27
+        class_weight="balanced",
         random_state=42
     )
     model.fit(X_train, y_train)
 
-    # Evaluasi
     y_pred = model.predict(X_test)
     acc  = accuracy_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred)
@@ -58,4 +64,3 @@ with mlflow.start_run(run_name="RandomForest_Autolog"):
     print(f"F1 Score  : {f1:.4f}")
 
     print("\nModel berhasil dicatat di MLflow!")
-    print("Jalankan 'mlflow ui' di terminal untuk melihat hasilnya.")
